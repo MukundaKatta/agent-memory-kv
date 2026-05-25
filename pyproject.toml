@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-memory-kv"
+version = "0.1.0"
+description = "Persistent key-value memory for agents backed by a JSON file with optional TTL"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+keywords = ["agent", "memory", "kv", "persistent", "ttl"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Intended Audience :: Developers",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
