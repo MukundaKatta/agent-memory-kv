@@ -14,7 +14,16 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Intended Audience :: Developers",
+    "Typing :: Typed",
 ]
+
+[project.urls]
+Homepage = "https://github.com/MukundaKatta/agent-memory-kv"
+Repository = "https://github.com/MukundaKatta/agent-memory-kv"
+Issues = "https://github.com/MukundaKatta/agent-memory-kv/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+agent_memory_kv = ["py.typed"]
