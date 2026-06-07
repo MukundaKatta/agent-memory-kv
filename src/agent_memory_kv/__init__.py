@@ -19,20 +19,26 @@ class MemoryKeyError(KeyError):
 @dataclass
 class _Entry:
     value: Any
-    expires_at: Optional[float]  # monotonic time, None = never
+    expires_at: Optional[float]  # Unix epoch seconds (time.time), None = never
 
     def is_expired(self) -> bool:
         if self.expires_at is None:
             return False
-        return time.monotonic() >= self.expires_at
+        return time.time() >= self.expires_at
 
 
 class AgentMemory:
-    """
-    Persistent key-value store for agent memory.
+    """Persistent key-value store for agent memory.
 
-    Values survive process restarts (backed by a JSON file).
-    Supports optional per-key TTL expiry.
+    Values survive process restarts because they are backed by a JSON file on
+    disk. Each :meth:`set` writes the whole store atomically (via a temp file
+    and :func:`os.replace`), so a crash mid-write cannot corrupt the file.
+
+    Optional per-key TTL expiry is supported. Expiry times are stored as
+    absolute Unix timestamps, so a TTL set in one process is honored correctly
+    after a restart.
+
+    All public methods are thread-safe (guarded by an internal lock).
 
     Usage::
 
@@ -43,6 +49,9 @@ class AgentMemory:
         mem.has("user_name")             # True
         mem.delete("user_name")
         mem.keys()                       # list of non-expired keys
+
+    :param path: Filesystem path to the backing JSON file. ``~`` is expanded.
+        Parent directories are created on first write if they do not exist.
     """
 
     def __init__(self, path: str) -> None:
@@ -91,8 +100,18 @@ class AgentMemory:
     # -- public API -----------------------------------------------------------
 
     def set(self, key: str, value: Any, ttl: Optional[float] = None) -> None:
-        """Set a key. ttl is seconds from now; None = never expires."""
-        expires_at = (time.monotonic() + ttl) if ttl is not None else None
+        """Set ``key`` to ``value``, persisting immediately.
+
+        :param key: The key to store under.
+        :param value: Any JSON-serializable value.
+        :param ttl: Optional time-to-live in seconds from now. ``None`` (the
+            default) means the entry never expires. Because the expiry is stored
+            as an absolute Unix timestamp, TTLs survive process restarts.
+        :raises ValueError: If ``ttl`` is not positive.
+        """
+        if ttl is not None and ttl <= 0:
+            raise ValueError("ttl must be a positive number of seconds")
+        expires_at = (time.time() + ttl) if ttl is not None else None
         with self._lock:
             self._data[key] = _Entry(value=value, expires_at=expires_at)
             self._save()
@@ -114,6 +133,7 @@ class AgentMemory:
             return entry.value
 
     def has(self, key: str) -> bool:
+        """Return ``True`` if ``key`` exists and has not expired."""
         with self._lock:
             entry = self._data.get(key)
             return entry is not None and not entry.is_expired()
@@ -138,6 +158,7 @@ class AgentMemory:
             return [(k, e.value) for k, e in self._data.items() if not e.is_expired()]
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a plain ``dict`` of all non-expired (key, value) pairs."""
         return dict(self.items())
 
     def clear(self) -> int:
