@@ -1,6 +1,7 @@
 """
 agent-memory-kv: Persistent key-value memory for agents, backed by a JSON file.
 """
+
 from __future__ import annotations
 
 import json
@@ -19,12 +20,12 @@ class MemoryKeyError(KeyError):
 @dataclass
 class _Entry:
     value: Any
-    expires_at: Optional[float]  # monotonic time, None = never
+    expires_at: Optional[float]  # wall-clock epoch seconds, None = never
 
     def is_expired(self) -> bool:
         if self.expires_at is None:
             return False
-        return time.monotonic() >= self.expires_at
+        return time.time() >= self.expires_at
 
 
 class AgentMemory:
@@ -92,7 +93,7 @@ class AgentMemory:
 
     def set(self, key: str, value: Any, ttl: Optional[float] = None) -> None:
         """Set a key. ttl is seconds from now; None = never expires."""
-        expires_at = (time.monotonic() + ttl) if ttl is not None else None
+        expires_at = (time.time() + ttl) if ttl is not None else None
         with self._lock:
             self._data[key] = _Entry(value=value, expires_at=expires_at)
             self._save()
